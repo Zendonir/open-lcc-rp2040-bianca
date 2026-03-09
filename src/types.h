@@ -73,6 +73,7 @@ typedef enum {
     SYSTEM_CONTROLLER_COALESCED_STATE_TEMPS_NORMALIZING,
     SYSTEM_CONTROLLER_COALESCED_STATE_WARM,
     SYSTEM_CONTROLLER_COALESCED_STATE_SLEEPING,
+    SYSTEM_CONTROLLER_COALESCED_STATE_STANDBY,
     SYSTEM_CONTROLLER_COALESCED_STATE_BAILED,
     SYSTEM_CONTROLLER_COALESCED_STATE_FIRST_RUN
 } SystemControllerCoalescedState;
@@ -81,14 +82,16 @@ struct SettingStruct {
     float brewTemperatureOffset = -10;
     bool sleepMode = false;
     bool ecoMode = false;
+    bool standbyMode = false;
     float brewTemperatureTarget = 105;
     float serviceTemperatureTarget = 120;
     uint16_t autoSleepMin = 0;
+    uint16_t autoStandbyMin = 0;
     PidSettings brewPidParameters = PidSettings{.Kp = 0.8, .Ki = 0.12, .Kd = 12.0, .windupLow = -7.f, .windupHigh = 7.f};
     PidSettings servicePidParameters = PidSettings{.Kp = 0.6, .Ki = 0.1, .Kd = 1.0, .windupLow = -10.f, .windupHigh = 10.f};
 };
 
-struct SystemControllerStatusMessage{
+struct SystemControllerStatusMessage {
     absolute_time_t timestamp{};
     float brewTemperature{};
     float offsetBrewTemperature{};
@@ -105,6 +108,7 @@ struct SystemControllerStatusMessage{
     bool serviceSSRActive{};
     bool ecoMode{};
     bool sleepMode{};
+    bool standbyMode{};
     SystemControllerInternalState internalState{};
     SystemControllerRunState runState{};
     SystemControllerCoalescedState coalescedState{};
@@ -112,9 +116,8 @@ struct SystemControllerStatusMessage{
     bool currentlyBrewing{};
     bool currentlyFillingServiceBoiler{};
     bool waterTankLow{};
-//    uint16_t autoSleepMinutes{};
-//    float plannedSleepInSeconds{};
-//    absolute_time_t lastSleepModeExitAt = nil_time;
+    float plannedAutoSleepInSeconds{};
+    float plannedAutoStandbyInSeconds{};
     uint16_t bailCounter{};
     uint16_t sbRawHi{};
     uint16_t sbRawLo{};
@@ -130,7 +133,9 @@ typedef enum {
     COMMAND_SET_SERVICE_PID_PARAMETERS,
     COMMAND_SET_ECO_MODE,
     COMMAND_SET_SLEEP_MODE,
+    COMMAND_SET_STANDBY_MODE,
     COMMAND_SET_AUTO_SLEEP_MINUTES,
+    COMMAND_SET_AUTO_STANDBY_MINUTES,
     COMMAND_UNBAIL,
     COMMAND_TRIGGER_FIRST_RUN,
     COMMAND_BEGIN,
@@ -150,7 +155,5 @@ struct SystemControllerCommand {
     uint32_t int2{};
     uint32_t int3{};
 };
-
-
 
 #endif //FIRMWARE_TYPES_H

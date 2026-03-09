@@ -86,6 +86,7 @@ enum ESPSystemCoalescedState: uint8_t {
     ESP_SYSTEM_COALESCED_STATE_TEMPS_NORMALIZING,
     ESP_SYSTEM_COALESCED_STATE_WARM,
     ESP_SYSTEM_COALESCED_STATE_SLEEPING,
+    ESP_SYSTEM_COALESCED_STATE_STANDBY,
     ESP_SYSTEM_COALESCED_STATE_BAILED,
     ESP_SYSTEM_COALESCED_STATE_FIRST_RUN
 };
@@ -100,12 +101,15 @@ struct __attribute__((packed)) ESPSystemStatusMessage {
     float serviceBoilerSetPoint;
     float brewTemperatureOffset;
     uint16_t autoSleepAfter;
+    uint16_t autoStandbyAfter;
     bool currentlyBrewing;
     bool currentlyFillingServiceBoiler;
     bool ecoMode;
     bool sleepMode;
+    bool standbyMode;
     bool waterTankLow;
     uint16_t plannedAutoSleepInSeconds;
+    uint16_t plannedAutoStandbyInSeconds;
     float rp2040Temperature;
     uint16_t numBails;
     uint32_t rp2040UptimeSeconds;
@@ -133,7 +137,9 @@ enum ESPSystemCommandType: uint32_t {
     ESP_SYSTEM_COMMAND_SET_SERVICE_PID_PARAMETERS,
     ESP_SYSTEM_COMMAND_SET_ECO_MODE,
     ESP_SYSTEM_COMMAND_SET_SLEEP_MODE,
+    ESP_SYSTEM_COMMAND_SET_STANDBY_MODE,
     ESP_SYSTEM_COMMAND_SET_AUTO_SLEEP_MINUTES,
+    ESP_SYSTEM_COMMAND_SET_AUTO_STANDBY_MINUTES,
     ESP_SYSTEM_COMMAND_SET_FLOW_MODE,
     ESP_SYSTEM_COMMAND_ENQUEUE_ROUTINE,
     ESP_SYSTEM_COMMAND_CANCEL_ROUTINE,
@@ -190,4 +196,5 @@ struct __attribute__((packed)) ESPESPStatusMessage {
     bool scaleConnected;
     float weightInGrams;
 };
+
 #endif //SMART_LCC_ESP_PROTOCOL_H

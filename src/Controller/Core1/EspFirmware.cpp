@@ -37,7 +37,7 @@ void EspFirmware::onUartRx() {
 
     while (uart_is_readable(EspFirmware::interruptedUart)) {
         uint8_t ch = uart_getc(EspFirmware::interruptedUart);
-        ringbuffer.insert( ch);
+        ringbuffer.insert(ch);
     }
 }
 
@@ -47,7 +47,7 @@ bool EspFirmware::readFromRingBufferBlockingWithTimeout(uint8_t *dst, size_t len
 
     for (size_t i = 0; i < len; ++i) {
         while (ringbuffer.readAvailable() < len) {
-            if (timeout_check(&ts)) {
+            if (timeout_check(&ts, false)) {
                 return false;
             }
 
@@ -60,21 +60,19 @@ bool EspFirmware::readFromRingBufferBlockingWithTimeout(uint8_t *dst, size_t len
     return readLen == len;
 }
 
-EspFirmware::EspFirmware(uart_inst_t *uart, PicoQueue<SystemControllerCommand> *commandQueue, SystemStatus* status, SettingsManager* settingsManager, Automations* automations) : uart(uart), commandQueue(commandQueue), status(status), settingsManager(settingsManager), automations(automations) {}
+EspFirmware::EspFirmware(uart_inst_t *uart, PicoQueue<SystemControllerCommand> *commandQueue, SystemStatus* status, SettingsManager* settingsManager, Automations* automations)
+    : uart(uart), commandQueue(commandQueue), status(status), settingsManager(settingsManager), automations(automations) {}
 
-uint32_t rnd(void){
-    int k, random=0;
-    volatile uint32_t *rnd_reg=(uint32_t *)(ROSC_BASE + ROSC_RANDOMBIT_OFFSET);
+uint32_t rnd(void) {
+    int k, random = 0;
+    volatile uint32_t *rnd_reg = (uint32_t *)(ROSC_BASE + ROSC_RANDOMBIT_OFFSET);
 
-    for(k=0;k<32;k++){
-
+    for (k = 0; k < 32; k++) {
         random = random << 1;
-        random=random + (0x00000001 & (*rnd_reg));
-
+        random = random + (0x00000001 & (*rnd_reg));
     }
     return random;
 }
-
 
 bool EspFirmware::pingBlocking() {
     ESPMessageHeader pingHeader{
@@ -105,7 +103,6 @@ bool EspFirmware::pingBlocking() {
         if (success) {
             if (replyHeader.type != ESP_MESSAGE_PONG || replyHeader.responseTo != 1 || replyHeader.error != ESP_ERROR_NONE) {
                 free(response);
-
                 return false;
             } else {
                 auto *replyMessage = reinterpret_cast<ESPPongMessage *>(response);
@@ -129,10 +126,12 @@ bool EspFirmware::sendStatus(
         float externalTemperature2,
         float externalTemperature3,
         uint16_t autoSleepMinutes,
+        uint16_t autoStandbyMinutes,
         float plannedSleepInSeconds,
+        float plannedStandbyInSeconds,
         uint16_t currentRoutine,
         uint16_t currentRoutineStep
-                ) {
+) {
     ESPMessageHeader statusHeader{
             .direction = ESP_DIRECTION_RP2040_TO_ESP32,
             .id = rnd(),
@@ -146,6 +145,11 @@ bool EspFirmware::sendStatus(
     uint16_t autosleepIn = 0;
     if (!std::isinf(plannedSleepInSeconds)) {
         autosleepIn = (uint16_t)plannedSleepInSeconds;
+    }
+
+    uint16_t autostandbyIn = 0;
+    if (!std::isinf(plannedStandbyInSeconds)) {
+        autostandbyIn = (uint16_t)plannedStandbyInSeconds;
     }
 
     uint8_t flowMode = ESP_FLOW_MODE_PUMP_ON_SOLENOID_OPEN;
@@ -174,12 +178,15 @@ bool EspFirmware::sendStatus(
             .serviceBoilerSetPoint = systemControllerStatusMessage->serviceSetPoint,
             .brewTemperatureOffset = systemControllerStatusMessage->brewTemperatureOffset,
             .autoSleepAfter = autoSleepMinutes,
+            .autoStandbyAfter = autoStandbyMinutes,
             .currentlyBrewing = systemControllerStatusMessage->currentlyBrewing,
             .currentlyFillingServiceBoiler = systemControllerStatusMessage->currentlyFillingServiceBoiler,
             .ecoMode = systemControllerStatusMessage->ecoMode,
             .sleepMode = systemControllerStatusMessage->sleepMode,
+            .standbyMode = systemControllerStatusMessage->standbyMode,
             .waterTankLow = systemControllerStatusMessage->waterTankLow,
             .plannedAutoSleepInSeconds = autosleepIn,
+            .plannedAutoStandbyInSeconds = autostandbyIn,
             .rp2040Temperature = 0,
             .numBails = systemControllerStatusMessage->bailCounter,
             .rp2040UptimeSeconds = to_ms_since_boot(systemControllerStatusMessage->timestamp) / 1000,
@@ -234,7 +241,7 @@ void EspFirmware::loop() {
             printf("Message received\n");
             printlnhex(reinterpret_cast<uint8_t *>(&header), sizeof(ESPMessageHeader));
             if (header.direction == ESP_DIRECTION_ESP32_TO_RP2040) {
-                switch(header.type) {
+                switch (header.type) {
                     case ESP_MESSAGE_SYSTEM_COMMAND:
                         return handleCommand(&header);
 //                    case ESP_MESSAGE_ESP_STATUS:
@@ -247,7 +254,6 @@ void EspFirmware::loop() {
                     default:
                         ringbuffer.consumerClear();
                         return;
-
                 }
             }
         }
@@ -286,80 +292,109 @@ void EspFirmware::handleCommand(ESPMessageHeader *header) {
             if (crc == message.checksum) {
                 USB_PRINTF("Command received, CRC correct, type: %u, i1: %u\n", message.payload.type, message.payload.int1);
 
-                switch (message.payload.type) {
-                    case ESP_SYSTEM_COMMAND_SET_SLEEP_MODE:
-                        if (!message.payload.bool1) {
-                            automations->exitingSleep();
-                        }
-                        settingsManager->setSleepMode(message.payload.bool1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_BREW_SET_POINT:
-                        settingsManager->setOffsetTargetBrewTemp(message.payload.float1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_BREW_PID_PARAMETERS:
-                        settingsManager->setBrewPidParameters(PidSettings{
-                                .Kp = message.payload.float1,
-                                .Ki = message.payload.float2,
-                                .Kd = message.payload.float3,
-                                .windupLow = message.payload.float4,
-                                .windupHigh = message.payload.float5
-                        });
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_BREW_OFFSET:
-                        settingsManager->setBrewTemperatureOffset(message.payload.float1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_SERVICE_SET_POINT:
-                        settingsManager->setTargetServiceTemp(message.payload.float1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_SERVICE_PID_PARAMETERS:
-                        settingsManager->setServicePidParameters(PidSettings{
-                                .Kp = message.payload.float1,
-                                .Ki = message.payload.float2,
-                                .Kd = message.payload.float3,
-                                .windupLow = message.payload.float4,
-                                .windupHigh = message.payload.float5
-                        });
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_ECO_MODE:
-                        settingsManager->setEcoMode(message.payload.bool1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_SET_AUTO_SLEEP_MINUTES:
-                        settingsManager->setAutoSleepMin(message.payload.float1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_FORCE_HARD_BAIL: {
-                        auto command = SystemControllerCommand{.type = COMMAND_FORCE_HARD_BAIL};
-                        commandQueue->addBlocking(&command);
-                        break;
+            switch (message.payload.type) {
+                case ESP_SYSTEM_COMMAND_SET_SLEEP_MODE:
+                    if (!message.payload.bool1) {
+                        automations->exitingSleep();
                     }
-                    case ESP_SYSTEM_COMMAND_SET_FLOW_MODE: {
-                        uint32_t arg;
-                        switch (message.payload.int1) {
-                            case ESP_FLOW_MODE_PUMP_ON_SOLENOID_OPEN:
-                                arg = PUMP_ON_SOLENOID_OPEN;
-                                break;
-                            case ESP_FLOW_MODE_PUMP_OFF_SOLENOID_OPEN:
-                                arg = PUMP_OFF_SOLENOID_OPEN;
-                                break;
-                            case ESP_FLOW_MODE_PUMP_ON_SOLENOID_CLOSED:
-                                arg = PUMP_ON_SOLENOID_CLOSED;
-                                break;
-                            case ESP_FLOW_MODE_PUMP_OFF_SOLENOID_CLOSED:
-                                arg = PUMP_OFF_SOLENOID_CLOSED;
-                                break;
-                            default:
-                                arg = PUMP_ON_SOLENOID_OPEN;
-                        }
+                    if (message.payload.bool1) {
+                        settingsManager->setStandbyMode(false);
+                    }
+                    settingsManager->setSleepMode(message.payload.bool1);
+                    break;
 
-                        auto command = SystemControllerCommand{.type = COMMAND_SET_FLOW_MODE, .int1 = arg};
-                        commandQueue->addBlocking(&command);
-                        break;
+                case ESP_SYSTEM_COMMAND_SET_STANDBY_MODE:
+                    if (message.payload.bool1) {
+                        settingsManager->setSleepMode(false);
                     }
-                    case ESP_SYSTEM_COMMAND_ENQUEUE_ROUTINE:
-                        automations->enqueueRoutine(message.payload.int1);
-                        break;
-                    case ESP_SYSTEM_COMMAND_CLEAR_ROUTINE:
-                        automations->cancelRoutine();
+                    settingsManager->setStandbyMode(message.payload.bool1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_BREW_SET_POINT:
+                    settingsManager->setOffsetTargetBrewTemp(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_BREW_PID_PARAMETERS:
+                    settingsManager->setBrewPidParameters(PidSettings{
+                            .Kp = message.payload.float1,
+                            .Ki = message.payload.float2,
+                            .Kd = message.payload.float3,
+                            .windupLow = message.payload.float4,
+                            .windupHigh = message.payload.float5
+                    });
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_BREW_OFFSET:
+                    settingsManager->setBrewTemperatureOffset(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_SERVICE_SET_POINT:
+                    settingsManager->setTargetServiceTemp(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_SERVICE_PID_PARAMETERS:
+                    settingsManager->setServicePidParameters(PidSettings{
+                            .Kp = message.payload.float1,
+                            .Ki = message.payload.float2,
+                            .Kd = message.payload.float3,
+                            .windupLow = message.payload.float4,
+                            .windupHigh = message.payload.float5
+                    });
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_ECO_MODE:
+                    settingsManager->setEcoMode(message.payload.bool1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_AUTO_SLEEP_MINUTES:
+                    settingsManager->setAutoSleepMin(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_AUTO_STANDBY_MINUTES:
+                    settingsManager->setAutoStandbyMin(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_FORCE_HARD_BAIL: {
+                    auto command = SystemControllerCommand{.type = COMMAND_FORCE_HARD_BAIL};
+                    commandQueue->addBlocking(&command);
+                    break;
                 }
+
+                case ESP_SYSTEM_COMMAND_SET_FLOW_MODE: {
+                    uint32_t arg;
+                    switch (message.payload.int1) {
+                        case ESP_FLOW_MODE_PUMP_ON_SOLENOID_OPEN:
+                            arg = PUMP_ON_SOLENOID_OPEN;
+                            break;
+                        case ESP_FLOW_MODE_PUMP_OFF_SOLENOID_OPEN:
+                            arg = PUMP_OFF_SOLENOID_OPEN;
+                            break;
+                        case ESP_FLOW_MODE_PUMP_ON_SOLENOID_CLOSED:
+                            arg = PUMP_ON_SOLENOID_CLOSED;
+                            break;
+                        case ESP_FLOW_MODE_PUMP_OFF_SOLENOID_CLOSED:
+                            arg = PUMP_OFF_SOLENOID_CLOSED;
+                            break;
+                        default:
+                            arg = PUMP_ON_SOLENOID_OPEN;
+                    }
+
+                    auto command = SystemControllerCommand{.type = COMMAND_SET_FLOW_MODE, .int1 = arg};
+                    commandQueue->addBlocking(&command);
+                    break;
+                }
+
+                case ESP_SYSTEM_COMMAND_ENQUEUE_ROUTINE:
+                    automations->enqueueRoutine(message.payload.int1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_CLEAR_ROUTINE:
+                    automations->cancelRoutine();
+                    break;
+
+                default:
+                    break;
+            }
 
                 sendAck(header->id);
             } else {

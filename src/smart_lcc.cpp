@@ -326,10 +326,12 @@ int i2c_bus_scan(i2c_inst_t* i2c) {
                     externalTemp2,
                     externalTemp3,
                     settingsManager->getAutoSleepMin(),
+                    settingsManager->getAutoStandbyMin(),
                     automations->getPlannedSleepInMinutes(),
+                    automations->getPlannedStandbyInMinutes(),
                     automations->getCurrentlyLoadedRoutine(),
                     automations->getCurrentRoutineStep()
-                    );
+            );
             nextSend = make_timeout_time_ms(250); // Normal 250
 
             settingsManager->writeSettingsIfChanged();

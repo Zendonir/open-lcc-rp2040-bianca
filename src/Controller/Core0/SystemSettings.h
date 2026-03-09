@@ -14,8 +14,10 @@ public:
     [[nodiscard]] inline float getBrewTemperatureOffset() const { return currentSettings.brewTemperatureOffset; };
     inline bool getEcoMode() const { return currentSettings.ecoMode; };
     inline bool getSleepMode() const { return currentSettings.sleepMode; };
+    inline bool getStandbyMode() const { return currentSettings.standbyMode; };
     inline float getTargetBrewTemp() const { return currentSettings.brewTemperatureTarget; };
     [[nodiscard]] inline uint16_t getAutoSleepMin() const { return currentSettings.autoSleepMin; };
+    [[nodiscard]] inline uint16_t getAutoStandbyMin() const { return currentSettings.autoStandbyMin; };
     inline float getOffsetTargetBrewTemp() const { return currentSettings.brewTemperatureTarget + currentSettings.brewTemperatureOffset; };
     inline float getTargetServiceTemp() const { return currentSettings.serviceTemperatureTarget; };
     inline PidSettings getBrewPidParameters() const { return currentSettings.brewPidParameters; };
@@ -24,8 +26,10 @@ public:
     inline void setBrewTemperatureOffset(float offset) { currentSettings.brewTemperatureOffset = offset; };
     inline void setEcoMode(bool ecoMode) { currentSettings.ecoMode = ecoMode; };
     inline void setSleepMode(bool sleepMode) { currentSettings.sleepMode = sleepMode; };
+    inline void setStandbyMode(bool standbyMode) { currentSettings.standbyMode = standbyMode; };
     inline void setTargetBrewTemp(float targetBrewTemp) { currentSettings.brewTemperatureTarget = targetBrewTemp; };
     inline void setAutoSleepMin(uint16_t minutes) { currentSettings.autoSleepMin = minutes; };
+    inline void setAutoStandbyMin(uint16_t minutes) { currentSettings.autoStandbyMin = minutes; };
     inline void setOffsetTargetBrewTemp(float offsetTargetBrewTemp) { setTargetBrewTemp(offsetTargetBrewTemp - currentSettings.brewTemperatureOffset); };
     inline void setTargetServiceTemp(float targetServiceTemp) { currentSettings.serviceTemperatureTarget = targetServiceTemp; };
     inline void setBrewPidParameters(PidSettings params) { currentSettings.brewPidParameters = params; };
@@ -33,6 +37,5 @@ public:
 private:
     SettingStruct currentSettings;
 };
-
 
 #endif //FIRMWARE_SYSTEMSETTINGS_H

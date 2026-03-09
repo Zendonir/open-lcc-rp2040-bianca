@@ -5,7 +5,6 @@
 #ifndef SMART_LCC_ESPFIRMWARE_H
 #define SMART_LCC_ESPFIRMWARE_H
 
-
 #include "hardware/uart.h"
 #include "esp-protocol.h"
 #include "utils/ClearUartCruft.h"
@@ -34,10 +33,12 @@ public:
                     float externalTemperature2,
                     float externalTemperature3,
                     uint16_t autoSleepMinutes,
+                    uint16_t autoStandbyMinutes,
                     float plannedSleepInSeconds,
+                    float plannedStandbyInSeconds,
                     uint16_t currentRoutine,
                     uint16_t currentRoutineStep
-                            );
+    );
 
 private:
     uart_inst_t *uart;
@@ -93,6 +94,8 @@ private:
                 return ESP_SYSTEM_COALESCED_STATE_WARM;
             case SYSTEM_CONTROLLER_COALESCED_STATE_SLEEPING:
                 return ESP_SYSTEM_COALESCED_STATE_SLEEPING;
+            case SYSTEM_CONTROLLER_COALESCED_STATE_STANDBY:
+                return ESP_SYSTEM_COALESCED_STATE_STANDBY;
             case SYSTEM_CONTROLLER_COALESCED_STATE_BAILED:
                 return ESP_SYSTEM_COALESCED_STATE_BAILED;
             case SYSTEM_CONTROLLER_COALESCED_STATE_FIRST_RUN:
@@ -103,6 +106,5 @@ private:
         }
     }
 };
-
 
 #endif //SMART_LCC_ESPFIRMWARE_H

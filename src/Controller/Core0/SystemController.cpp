@@ -22,7 +22,7 @@ SystemController::SystemController(
         incomingQueue(incomingQueue),
         brewBoilerController(20, 20.0f, PidSettings{}, 2.0f),
         serviceBoilerController(20, 0.5f)
-        {
+{
     safeLccRawPacket = create_safe_packet();
     currentLccParsedPacket = LccParsedPacket();
     settings = new SystemSettings();
@@ -35,7 +35,7 @@ void SystemController::sendSafePacketNoWait() {
 
 void SystemController::loop() {
     if (internalState == NOT_STARTED_YET) {
-        auto timeout = make_timeout_time_ms(1000); // Default 1000
+        auto timeout = make_timeout_time_ms(1000);
 
         sendSafePacketNoWait();
 
@@ -49,11 +49,14 @@ void SystemController::loop() {
     uart_clear_cruft(uart);
     sendLccPacket();
 
-    // This timeout is used both as a timeout for reading from the UART and to know when to send the next packet.
-    auto timeout = make_timeout_time_ms(100); // default 100
+    auto timeout = make_timeout_time_ms(100);
 
-    bool success = uart_read_blocking_timeout(uart, reinterpret_cast<uint8_t *>(&currentControlBoardRawPacket),
-                                              sizeof(currentControlBoardRawPacket), timeout);
+    bool success = uart_read_blocking_timeout(
+            uart,
+            reinterpret_cast<uint8_t *>(&currentControlBoardRawPacket),
+            sizeof(currentControlBoardRawPacket),
+            timeout
+    );
 
     if (!success) {
         softBail(BAIL_REASON_CB_UNRESPONSIVE);
@@ -61,7 +64,7 @@ void SystemController::loop() {
 
     uint16_t cbValidation = validate_raw_packet(currentControlBoardRawPacket);
 
-    if (success && cbValidation != CONTROL_BOARD_VALIDATION_ERROR_NONE ) {
+    if (success && cbValidation != CONTROL_BOARD_VALIDATION_ERROR_NONE) {
         USB_PRINTF("Received packet, validation: %u:\n", cbValidation);
         USB_PRINT_BUF(reinterpret_cast<uint8_t *>(&currentControlBoardRawPacket), sizeof(currentControlBoardRawPacket));
         USB_PRINTF("\n");
@@ -83,14 +86,12 @@ void SystemController::loop() {
         }
     } else if (internalState == RUNNING) {
         currentControlBoardParsedPacket = convert_raw_control_board_packet(currentControlBoardRawPacket);
-
         handleRunningStateAutomations();
     }
 
     uint16_t sbLow = triplet_to_int(currentControlBoardRawPacket.service_boiler_temperature_low_gain);
     uint16_t sbHi = triplet_to_int(currentControlBoardRawPacket.service_boiler_temperature_high_gain);
 
-    // Reset the current raw packet.
     currentControlBoardRawPacket = ControlBoardRawPacket();
 
     handleCommands();
@@ -101,9 +102,18 @@ void SystemController::loop() {
         currentLccParsedPacket = convert_lcc_raw_to_parsed(safeLccRawPacket);
     }
 
-    float sleepSeconds = plannedAutoSleepAt.has_value() ? (float)(absolute_time_diff_us(get_absolute_time(), plannedAutoSleepAt.value())) / 1000.f / 1000.f : INFINITY;
+    float sleepSeconds = plannedAutoSleepAt.has_value()
+                         ? (float)(absolute_time_diff_us(get_absolute_time(), plannedAutoSleepAt.value())) / 1000.f / 1000.f
+                         : INFINITY;
     if (sleepSeconds < 0) {
         sleepSeconds = 0.f;
+    }
+
+    float standbySeconds = plannedAutoStandbyAt.has_value()
+                           ? (float)(absolute_time_diff_us(get_absolute_time(), plannedAutoStandbyAt.value())) / 1000.f / 1000.f
+                           : INFINITY;
+    if (standbySeconds < 0) {
+        standbySeconds = 0.f;
     }
 
     SystemControllerStatusMessage message = {
@@ -123,6 +133,7 @@ void SystemController::loop() {
             .serviceSSRActive = currentLccParsedPacket.service_boiler_ssr_on,
             .ecoMode = settings->getEcoMode(),
             .sleepMode = settings->getSleepMode(),
+            .standbyMode = settings->getStandbyMode(),
             .internalState = internalState,
             .runState = runState,
             .coalescedState = externalState(),
@@ -131,9 +142,8 @@ void SystemController::loop() {
             .currentlyFillingServiceBoiler = currentLccParsedPacket.pump_on &&
                                              currentLccParsedPacket.service_boiler_solenoid_open,
             .waterTankLow = !isBailed() && currentControlBoardParsedPacket.water_tank_empty,
-//            .autoSleepMinutes = settings->getAutoSleepMin(),
-//            .plannedSleepInSeconds = sleepSeconds,
-//            .lastSleepModeExitAt = lastSleepModeExitAt,
+            .plannedAutoSleepInSeconds = sleepSeconds,
+            .plannedAutoStandbyInSeconds = standbySeconds,
             .bailCounter = bailCounter,
             .sbRawHi = sbHi,
             .sbRawLo = sbLow,
@@ -162,7 +172,6 @@ void SystemController::sendLccPacket() {
     }
 }
 
-
 void SystemController::updateForFlowMode(LccParsedPacket *parsedPacket) {
     if (flowMode == PUMP_ON_SOLENOID_OPEN) {
         parsedPacket->pump_on = true;
@@ -173,7 +182,7 @@ void SystemController::updateForFlowMode(LccParsedPacket *parsedPacket) {
     } else if (flowMode == PUMP_ON_SOLENOID_CLOSED) {
         parsedPacket->pump_on = true;
         parsedPacket->water_line_solenoid_open = false;
-    } else { // flowMode == PUMP_OFF_SOLENOID_CLOSED
+    } else {
         parsedPacket->pump_on = false;
         parsedPacket->water_line_solenoid_open = false;
     }
@@ -190,7 +199,6 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
 
     bool brewing = false;
 
-    // If we're not already brewing, don't start a brew or fill the service boiler if there is no water in the tank
     if (!brewStartedAt.has_value()) {
         if (!waterTankEmptyLatch.get()) {
             if (latestParsedPacket.brew_switch) {
@@ -199,30 +207,21 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
                 brewing = true;
 
                 onBrewStarted();
-            } else if (serviceBoilerLowLatch.get()) { // Starting a brew has priority over filling the service boiler
+            } else if (serviceBoilerLowLatch.get()) {
                 lcc.pump_on = true;
                 lcc.water_line_solenoid_open = true;
                 lcc.service_boiler_solenoid_open = true;
             }
         }
-    } else { // If we are brewing, keep brewing even if there is no water in the tank
+    } else {
         if (latestParsedPacket.brew_switch) {
             updateForFlowMode(&lcc);
             brewing = true;
-        } else { // Filling the service boiler is not an option while brewing
+        } else {
             onBrewEnded();
         }
     }
 
-    /*
-     * New algorithm:
-     *
-     * Cap BB and SB at 25 respectively. Divide time into 25 x 100 ms slots.
-     *
-     * If BB + SB < 25: Both get what they want.
-     * Else: They get a proportional share of what they want.
-     *   I.e. if BB = 17 and SB = 13, BB gets round((17/(17+13))*25) = 14 and SB gets round((13/(17+13))*25) = 11.
-     */
     if (ssrStateQueue.isEmpty()) {
         float feedForward = 0.0f;
         if (brewStartedAt.has_value()) {
@@ -233,28 +232,21 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
                 brewTempAverage.average(),
                 brewing ? feedForward : 0.f,
                 shouldForceHysteresisForBrewBoiler()
-                );
+        );
         uint8_t sbSignal = serviceBoilerController.getControlSignal(serviceTempAverage.average());
-
-//        printf("Raw signals. BB: %u SB: %u\n", bbSignal, sbSignal);
 
         if (settings->getEcoMode()) {
             sbSignal = 0;
         }
 
-        // Power-sharing
         if (bbSignal + sbSignal > 25) {
             if (!brewing) {
-                // If we're brewing, prioritize the brew boiler fully
-                // Otherwise, give the brew boiler slightly less than 75% priority
-                bbSignal = floor((float)bbSignal * 0.75);
+                bbSignal = floor((float)bbSignal * 0.75f);
             }
             sbSignal = 25 - bbSignal;
         }
 
         uint8_t noSignal = 25 - bbSignal - sbSignal;
-
-        //printf("Adding new controls to the queue. BB: %u SB: %u NB: %u\n", bbSignal, sbSignal, noSignal);
 
         for (uint8_t i = 0; i < bbSignal; ++i) {
             SsrState state = BREW_BOILER_SSR_ON;
@@ -285,14 +277,12 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
     }
 
     brewPidRuntimeParameters = brewBoilerController.getRuntimeParameters();
-    //servicePidRuntimeParameters = serviceBoilerController.getRuntimeParameters();
 
     return lcc;
 }
 
 void SystemController::handleCommands() {
     SystemControllerCommand command;
-    //printf("Q: %u\n", incomingQueue->getLevelUnsafe());
     while (!incomingQueue->isEmpty()) {
         incomingQueue->removeBlocking(&command);
 
@@ -333,8 +323,18 @@ void SystemController::handleCommands() {
             case COMMAND_SET_SLEEP_MODE:
                 setSleepMode(command.bool1);
                 break;
+            case COMMAND_SET_STANDBY_MODE:
+                if (command.bool1) {
+                    setSleepMode(false);
+                }
+                settings->setStandbyMode(command.bool1);
+                updateControllerSettings();
+                break;
             case COMMAND_SET_AUTO_SLEEP_MINUTES:
                 setAutoSleepMinutes(command.float1);
+                break;
+            case COMMAND_SET_AUTO_STANDBY_MINUTES:
+                setAutoStandbyMinutes(command.float1);
                 break;
             case COMMAND_UNBAIL:
                 unbail();
@@ -371,9 +371,11 @@ void SystemController::handleCommands() {
 
 void SystemController::updateControllerSettings() {
     brewBoilerController.setPidParameters(settings->getBrewPidParameters());
-    //serviceBoilerController.setPidParameters(servicePidParameters);
 
-    if (settings->getSleepMode()) {
+    if (settings->getStandbyMode()) {
+        brewBoilerController.updateSetPoint(0.f);
+        serviceBoilerController.updateSetPoint(0.f);
+    } else if (settings->getSleepMode()) {
         brewBoilerController.updateSetPoint(70.f);
         serviceBoilerController.updateSetPoint(0.f);
     } else if (runState == RUN_STATE_HEATUP_STAGE_1) {
@@ -420,6 +422,10 @@ SystemControllerCoalescedState SystemController::externalState() {
         case NOT_STARTED_YET:
             return SYSTEM_CONTROLLER_COALESCED_STATE_UNDETERMINED;
         case RUNNING:
+            if (settings->getStandbyMode()) {
+                return SYSTEM_CONTROLLER_COALESCED_STATE_STANDBY;
+            }
+
             if (settings->getSleepMode()) {
                 return SYSTEM_CONTROLLER_COALESCED_STATE_SLEEPING;
             }
@@ -432,7 +438,9 @@ SystemControllerCoalescedState SystemController::externalState() {
                     return SYSTEM_CONTROLLER_COALESCED_STATE_HEATUP;
                 case RUN_STATE_NORMAL:
                 default:
-                    return areTemperaturesAtSetPoint() ? SYSTEM_CONTROLLER_COALESCED_STATE_WARM : SYSTEM_CONTROLLER_COALESCED_STATE_TEMPS_NORMALIZING;
+                    return areTemperaturesAtSetPoint()
+                           ? SYSTEM_CONTROLLER_COALESCED_STATE_WARM
+                           : SYSTEM_CONTROLLER_COALESCED_STATE_TEMPS_NORMALIZING;
             }
         case SOFT_BAIL:
         case HARD_BAIL:
@@ -449,12 +457,12 @@ void SystemController::unbail() {
     bail_reason = BAIL_REASON_NONE;
     unbailTimer.reset();
     USB_PRINTF("Unbailed\n");
-
 }
 
 void SystemController::setSleepMode(bool _sleepMode) {
     if (_sleepMode) {
         onSleepModeEntered();
+        settings->setStandbyMode(false);
     } else {
         onSleepModeExited();
     }
@@ -487,11 +495,15 @@ bool SystemController::areTemperaturesAtSetPoint() const {
     float sbsplo = settings->getTargetServiceTemp() - 4.f;
     float sbsphi = settings->getTargetServiceTemp() + 4.f;
 
-    if (currentControlBoardParsedPacket.brew_boiler_temperature < bbsplo || currentControlBoardParsedPacket.brew_boiler_temperature > bbsphi) {
+    if (currentControlBoardParsedPacket.brew_boiler_temperature < bbsplo ||
+        currentControlBoardParsedPacket.brew_boiler_temperature > bbsphi) {
         return false;
     }
 
-    if (!settings->getEcoMode() && (currentControlBoardParsedPacket.service_boiler_temperature < sbsplo || currentControlBoardParsedPacket.service_boiler_temperature > sbsphi)) {
+    if (!settings->getEcoMode() &&
+        !settings->getStandbyMode() &&
+        (currentControlBoardParsedPacket.service_boiler_temperature < sbsplo ||
+         currentControlBoardParsedPacket.service_boiler_temperature > sbsphi)) {
         return false;
     }
 
@@ -501,33 +513,50 @@ bool SystemController::areTemperaturesAtSetPoint() const {
 void SystemController::onBrewStarted() {
     brewStartedAt = get_absolute_time();
 
-/*    // Starting a brew exits sleep mode
     if (settings->getSleepMode()) {
-        // @todo This doesn't play nicely with the settings move
-        settings->setSleepMode(false);
+        setSleepMode(false);
     }
 
-    resetPlannedSleep();*/
+    updatePlannedAutoSleep();
+    updatePlannedAutoStandby();
 }
 
 void SystemController::onBrewEnded() {
     brewStartedAt.reset();
+    updatePlannedAutoSleep();
+    updatePlannedAutoStandby();
 }
 
 void SystemController::setAutoSleepMinutes(float minutes) {
-/*    auto autoSleepMinutes = (uint16_t)minutes;
+    auto autoSleepMinutes = (uint16_t)minutes;
     settings->setAutoSleepMin(autoSleepMinutes);
 
-    resetPlannedSleep();*/
+    updatePlannedAutoSleep();
+}
+
+void SystemController::setAutoStandbyMinutes(float minutes) {
+    auto autoStandbyMinutes = (uint16_t)minutes;
+    settings->setAutoStandbyMin(autoStandbyMinutes);
+
+    updatePlannedAutoStandby();
 }
 
 void SystemController::updatePlannedAutoSleep() {
-/*    if (settings->getAutoSleepMin() > 0) {
+    if (settings->getAutoSleepMin() > 0) {
         uint32_t ms = (uint32_t)settings->getAutoSleepMin() * 60 * 1000;
         plannedAutoSleepAt = delayed_by_ms(get_absolute_time(), ms);
     } else {
         plannedAutoSleepAt.reset();
-    }*/
+    }
+}
+
+void SystemController::updatePlannedAutoStandby() {
+    if (settings->getAutoStandbyMin() > 0) {
+        uint32_t ms = (uint32_t)settings->getAutoStandbyMin() * 60 * 1000;
+        plannedAutoStandbyAt = delayed_by_ms(get_absolute_time(), ms);
+    } else {
+        plannedAutoStandbyAt.reset();
+    }
 }
 
 void SystemController::onSleepModeEntered() {
@@ -537,8 +566,7 @@ void SystemController::onSleepModeEntered() {
 }
 
 void SystemController::onSleepModeExited() {
-/*    lastSleepModeExitAt = get_absolute_time();
-    resetPlannedSleep();*/
+    updatePlannedAutoSleep();
 }
 
 void SystemController::handleRunningStateAutomations() {
@@ -558,10 +586,20 @@ void SystemController::handleRunningStateAutomations() {
         }
     }
 
-    /*
     if (!plannedAutoSleepAt.has_value()) {
-        resetPlannedSleep();
-    } else if (!settings->getSleepMode() && time_reached(plannedAutoSleepAt.value())) {
+        updatePlannedAutoSleep();
+    } else if (!settings->getSleepMode() &&
+               !settings->getStandbyMode() &&
+               time_reached(plannedAutoSleepAt.value())) {
         setSleepMode(true);
-    }*/
+    }
+
+    if (!plannedAutoStandbyAt.has_value()) {
+        updatePlannedAutoStandby();
+    } else if (!settings->getStandbyMode() &&
+               time_reached(plannedAutoStandbyAt.value())) {
+        setSleepMode(false);
+        settings->setStandbyMode(true);
+        updateControllerSettings();
+    }
 }

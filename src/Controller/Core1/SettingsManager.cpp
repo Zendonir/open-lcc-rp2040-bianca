@@ -11,64 +11,78 @@
 #define SETTINGS_CURRENT_VERSION 0x01
 #define SETTINGS_ADDR 0x00000000
 
-struct SettingsHeader{
+struct SettingsHeader {
     uint8_t version;
     crc32_t crc;
     size_t len;
 };
 
 const SettingStruct defaultSettings{
-        .brewTemperatureOffset = -10,
-        .sleepMode = false,
-        .ecoMode = false,
-        .brewTemperatureTarget = 105,
-        .serviceTemperatureTarget = 120,
-        .autoSleepMin = 0,
-        .brewPidParameters = PidSettings{.Kp = 0.8, .Ki = 0.12, .Kd = 12.0, .windupLow = -7.f, .windupHigh = 7.f},
-        .servicePidParameters = PidSettings{.Kp = 0.6, .Ki = 0.1, .Kd = 1.0, .windupLow = -10.f, .windupHigh = 10.f},
+    .brewTemperatureOffset = -10,
+    .sleepMode = false,
+    .ecoMode = false,
+    .standbyMode = false,
+    .brewTemperatureTarget = 105,
+    .serviceTemperatureTarget = 120,
+    .autoSleepMin = 0,
+    .autoStandbyMin = 0,
+    .brewPidParameters = PidSettings{.Kp = 0.8, .Ki = 0.12, .Kd = 12.0, .windupLow = -7.f, .windupHigh = 7.f},
+    .servicePidParameters = PidSettings{.Kp = 0.6, .Ki = 0.1, .Kd = 1.0, .windupLow = -10.f, .windupHigh = 10.f},
 };
 
-SettingsManager::SettingsManager(PicoQueue<SystemControllerCommand> *commandQueue, SettingsFlash* settingsFlash): commandQueue(commandQueue), settingsFlash(settingsFlash) {
-
+SettingsManager::SettingsManager(PicoQueue<SystemControllerCommand> *commandQueue, SettingsFlash *settingsFlash)
+    : commandQueue(commandQueue), settingsFlash(settingsFlash) {
 }
 
 void SettingsManager::sendMessage(SystemControllerCommand command) {
     commandQueue->tryAdd(&command);
 }
 
-void SettingsManager::setBrewTemperatureOffset(float offset)
-{
+void SettingsManager::setBrewTemperatureOffset(float offset) {
     currentSettings.brewTemperatureOffset = offset;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_BREW_OFFSET,
-            .float1 = offset,
+        .type = COMMAND_SET_BREW_OFFSET,
+        .float1 = offset,
     });
 }
 
-void SettingsManager::setEcoMode(bool ecoMode)
-{
+void SettingsManager::setEcoMode(bool ecoMode) {
     currentSettings.ecoMode = ecoMode;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_ECO_MODE,
-            .bool1 = ecoMode,
+        .type = COMMAND_SET_ECO_MODE,
+        .bool1 = ecoMode,
     });
 }
 
-void SettingsManager::setTargetBrewTemp(float targetBrewTemp)
-{
+void SettingsManager::setStandbyMode(bool standbyMode) {
+    currentSettings.standbyMode = standbyMode;
+    sendMessage(SystemControllerCommand{
+        .type = COMMAND_SET_STANDBY_MODE,
+        .bool1 = standbyMode,
+    });
+}
+
+void SettingsManager::setTargetBrewTemp(float targetBrewTemp) {
     currentSettings.brewTemperatureTarget = targetBrewTemp;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_BREW_SET_POINT,
-            .float1 = targetBrewTemp,
+        .type = COMMAND_SET_BREW_SET_POINT,
+        .float1 = targetBrewTemp,
     });
 }
 
-void SettingsManager::setAutoSleepMin(uint16_t minutes)
-{
+void SettingsManager::setAutoSleepMin(uint16_t minutes) {
     currentSettings.autoSleepMin = minutes;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_AUTO_SLEEP_MINUTES,
-            .float1 = static_cast<float>(minutes),
+        .type = COMMAND_SET_AUTO_SLEEP_MINUTES,
+        .float1 = static_cast<float>(minutes),
+    });
+}
+
+void SettingsManager::setAutoStandbyMin(uint16_t minutes) {
+    currentSettings.autoStandbyMin = minutes;
+    sendMessage(SystemControllerCommand{
+        .type = COMMAND_SET_AUTO_STANDBY_MINUTES,
+        .float1 = static_cast<float>(minutes),
     });
 }
 
@@ -76,54 +90,51 @@ void SettingsManager::setOffsetTargetBrewTemp(float offsetTargetBrewTemp) {
     setTargetBrewTemp(offsetTargetBrewTemp - currentSettings.brewTemperatureOffset);
 }
 
-void SettingsManager::setTargetServiceTemp(float targetServiceTemp)
-{
+void SettingsManager::setTargetServiceTemp(float targetServiceTemp) {
     currentSettings.serviceTemperatureTarget = targetServiceTemp;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_SERVICE_SET_POINT,
-            .float1 = targetServiceTemp,
+        .type = COMMAND_SET_SERVICE_SET_POINT,
+        .float1 = targetServiceTemp,
     });
 }
 
-void SettingsManager::setBrewPidParameters(PidSettings params)
-{
+void SettingsManager::setBrewPidParameters(PidSettings params) {
     currentSettings.brewPidParameters = params;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_BREW_PID_PARAMETERS,
-            .float1 = params.Kp,
-            .float2 = params.Ki,
-            .float3 = params.Kd,
-            .float4 = params.windupLow,
-            .float5 = params.windupHigh,
+        .type = COMMAND_SET_BREW_PID_PARAMETERS,
+        .float1 = params.Kp,
+        .float2 = params.Ki,
+        .float3 = params.Kd,
+        .float4 = params.windupLow,
+        .float5 = params.windupHigh,
     });
 }
 
-void SettingsManager::setServicePidParameters(PidSettings params)
-{
+void SettingsManager::setServicePidParameters(PidSettings params) {
     currentSettings.servicePidParameters = params;
     sendMessage(SystemControllerCommand{
-            .type = COMMAND_SET_SERVICE_PID_PARAMETERS,
-            .float1 = params.Kp,
-            .float2 = params.Ki,
-            .float3 = params.Kd,
-            .float4 = params.windupLow,
-            .float5 = params.windupHigh,
+        .type = COMMAND_SET_SERVICE_PID_PARAMETERS,
+        .float1 = params.Kp,
+        .float2 = params.Ki,
+        .float3 = params.Kd,
+        .float4 = params.windupLow,
+        .float5 = params.windupHigh,
     });
 }
 
-void SettingsManager::setSleepMode(bool sleepMode)
-{
+void SettingsManager::setSleepMode(bool sleepMode) {
     currentSettings.sleepMode = sleepMode;
     sendMessage(SystemControllerCommand{
         .type = COMMAND_SET_SLEEP_MODE,
-        .bool1 = sleepMode
+        .bool1 = sleepMode,
     });
 }
 
 void SettingsManager::initialize() {
     readSettings();
 
-    // If we've reset due to the watchdog or for some other reason, use the previous sleep mode setting, otherwise reset it to false
+    // If we've reset due to the watchdog or for some other reason, use the previous sleep mode setting,
+    // otherwise reset it to false
     if (currentSettings.sleepMode && !watchdog_enable_caused_reboot() && to_ms_since_boot(get_absolute_time()) < 20000) {
         currentSettings.sleepMode = false;
     }
@@ -197,9 +208,9 @@ void SettingsManager::writeToFlash() {
     uint8_t paddedData[SETTINGS_FLASH_PAGE_SIZE]{0};
 
     SettingsHeader header{
-            .version = SETTINGS_CURRENT_VERSION,
-            .crc = crc,
-            .len = sizeof(SettingStruct),
+        .version = SETTINGS_CURRENT_VERSION,
+        .crc = crc,
+        .len = sizeof(SettingStruct),
     };
 
     memcpy(paddedData, &header, sizeof(SettingsHeader));
@@ -214,8 +225,10 @@ void SettingsManager::writeToFlash() {
 void SettingsManager::sendAllSettings() {
     setBrewTemperatureOffset(currentSettings.brewTemperatureOffset);
     setEcoMode(currentSettings.ecoMode);
+    setStandbyMode(currentSettings.standbyMode);
     setTargetBrewTemp(currentSettings.brewTemperatureTarget);
     setAutoSleepMin(currentSettings.autoSleepMin);
+    setAutoStandbyMin(currentSettings.autoStandbyMin);
     setTargetServiceTemp(currentSettings.serviceTemperatureTarget);
     setBrewPidParameters(currentSettings.brewPidParameters);
     setServicePidParameters(currentSettings.servicePidParameters);

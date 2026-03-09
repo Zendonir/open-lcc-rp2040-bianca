@@ -30,10 +30,11 @@ public:
             uart_inst_t * _uart,
             PicoQueue<SystemControllerStatusMessage> *outgoingQueue,
             PicoQueue<SystemControllerCommand> *incomingQueue
-            );
+    );
 
     void loop();
     void sendSafePacketNoWait();
+
 private:
     SystemControllerBailReason bail_reason = BAIL_REASON_NONE;
     SystemControllerInternalState internalState = NOT_STARTED_YET;
@@ -54,6 +55,7 @@ private:
     nonstd::optional<absolute_time_t> heatupStage2Timer{};
     nonstd::optional<absolute_time_t> brewStartedAt{};
     nonstd::optional<absolute_time_t> plannedAutoSleepAt{};
+    nonstd::optional<absolute_time_t> plannedAutoStandbyAt{};
 
     uart_inst_t* uart;
     PicoQueue<SystemControllerStatusMessage> *outgoingQueue;
@@ -79,12 +81,12 @@ private:
     inline bool isSoftBailed() { return internalState == SOFT_BAIL; };
     void unbail();
 
-
     inline bool onlySendSafePackages() { return isBailed() || internalState == NOT_STARTED_YET; }
     [[nodiscard]] inline bool shouldForceHysteresisForBrewBoiler() const { return runState == RUN_STATE_HEATUP_STAGE_1 || runState == RUN_STATE_HEATUP_STAGE_2; };
 
     void setSleepMode(bool sleepMode);
     void setAutoSleepMinutes(float minutes);
+    void setAutoStandbyMinutes(float minutes);
 
     [[nodiscard]] bool areTemperaturesAtSetPoint() const;
 
@@ -110,6 +112,7 @@ private:
     void sendLccPacket();
 
     void updatePlannedAutoSleep();
+    void updatePlannedAutoStandby();
 
     void handleRunningStateAutomations();
 
@@ -121,6 +124,5 @@ private:
 
     void updateForFlowMode(LccParsedPacket* parsedPacket);
 };
-
 
 #endif //FIRMWARE_SYSTEMCONTROLLER_H

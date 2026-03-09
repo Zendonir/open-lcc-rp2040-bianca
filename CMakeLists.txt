@@ -4,11 +4,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-mcpu=cortex-m0plus -mthumb -Wswitch-enum -Wall -Wextra -DHARDWARE_REVISION_OPENLCC_R2A")
+set(CMAKE_CXX_FLAGS "-mcpu=cortex-m0plus -mthumb -Wswitch-enum -Wall -Wextra -DHARDWARE_REVISION_OPENLCC_R2B")
 set(CMAKE_CXX_FLAGS_DEBUG "-g2 -O0 -ggdb2")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -mthumb -Wswitch-enum -Wall -Wextra -DHARDWARE_REVISION_OPENLCC_R2A")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -mthumb -Wswitch-enum -Wall -Wextra -DHARDWARE_REVISION_OPENLCC_R2B")
 set(CMAKE_C_FLAGS_DEBUG "-g2 -O0 -ggdb2")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
@@ -98,8 +98,8 @@ function(bootloader_build_combined NAME)
     # TODO: The hard-coded 16k here is a bit nasty
     add_custom_target(${APP}_bin DEPENDS ${APP_BIN})
     add_custom_command(OUTPUT ${APP_BIN} DEPENDS ${NAME}.bin
-            COMMAND dd ibs=1k iseek=32 if=${NAME}.bin of=${APP_BIN}
-    )
+        	COMMAND dd if=${NAME}.bin of=${APP_BIN} bs=1k skip=32
+	)
 
     # TODO: The hard-coded address here is a bit nasty
     add_custom_target(${APP}_hdr DEPENDS ${APP}_bin)
@@ -114,9 +114,9 @@ function(bootloader_build_combined NAME)
     add_custom_command(TARGET ${COMBINED} POST_BUILD
             COMMAND ${CMAKE_OBJCOPY} -Obinary ${COMBINED}.elf ${COMBINED}.bin
     )
-    add_custom_command(TARGET ${COMBINED} POST_BUILD
-            COMMAND ELF2UF2 ${COMBINED}.elf ${COMBINED}.uf2
-            VERBATIM)
+	add_custom_command(TARGET ${COMBINED} POST_BUILD
+        	COMMAND ${CMAKE_BINARY_DIR}/_deps/picotool/picotool.exe uf2 convert ${COMBINED}.elf ${COMBINED}.uf2
+       		VERBATIM)
 endfunction()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/src build)
@@ -183,7 +183,7 @@ pico_enable_stdio_usb(smart_lcc 1)
 pico_enable_stdio_uart(smart_lcc 0)
 
 # create map/bin/hex file etc.
-pico_add_extra_outputs(smart_lcc)
+# pico_add_extra_outputs(smart_lcc)
 
 pico_set_linker_script(smart_lcc ${CMAKE_SOURCE_DIR}/memmap.ld)
 #pico_set_linker_script(smart_lcc ${CMAKE_SOURCE_DIR}/memmap-no-boot2.ld)
