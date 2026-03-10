@@ -324,11 +324,7 @@ void SystemController::handleCommands() {
                 setSleepMode(command.bool1);
                 break;
             case COMMAND_SET_STANDBY_MODE:
-                if (command.bool1) {
-                    setSleepMode(false);
-                }
-                settings->setStandbyMode(command.bool1);
-                updateControllerSettings();
+                setStandbyMode(command.bool1);
                 break;
             case COMMAND_SET_AUTO_SLEEP_MINUTES:
                 setAutoSleepMinutes(command.float1);
@@ -472,6 +468,27 @@ void SystemController::setSleepMode(bool _sleepMode) {
     updateControllerSettings();
 }
 
+void SystemController::setStandbyMode(bool standbyMode) {
+    if (standbyMode) {
+        setSleepMode(false);
+        settings->setStandbyMode(true);
+        plannedAutoStandbyAt.reset();
+    } else {
+        bool wasStandby = settings->getStandbyMode();
+
+        settings->setStandbyMode(false);
+        updatePlannedAutoStandby();
+
+        if (wasStandby &&
+            settings->getTargetBrewTemp() > 80 &&
+            currentControlBoardParsedPacket.brew_boiler_temperature < 65) {
+            initiateHeatup();
+        }
+    }
+
+    updateControllerSettings();
+}
+
 void SystemController::initiateHeatup() {
     runState = RUN_STATE_HEATUP_STAGE_1;
     updateControllerSettings();
@@ -551,6 +568,11 @@ void SystemController::updatePlannedAutoSleep() {
 }
 
 void SystemController::updatePlannedAutoStandby() {
+    if (settings->getStandbyMode()) {
+        plannedAutoStandbyAt.reset();
+        return;
+    }
+
     if (settings->getAutoStandbyMin() > 0) {
         uint32_t ms = (uint32_t)settings->getAutoStandbyMin() * 60 * 1000;
         plannedAutoStandbyAt = delayed_by_ms(get_absolute_time(), ms);
@@ -598,8 +620,6 @@ void SystemController::handleRunningStateAutomations() {
         updatePlannedAutoStandby();
     } else if (!settings->getStandbyMode() &&
                time_reached(plannedAutoStandbyAt.value())) {
-        setSleepMode(false);
-        settings->setStandbyMode(true);
-        updateControllerSettings();
+        setStandbyMode(true);
     }
 }

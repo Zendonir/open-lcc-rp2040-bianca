@@ -85,6 +85,7 @@ private:
     [[nodiscard]] inline bool shouldForceHysteresisForBrewBoiler() const { return runState == RUN_STATE_HEATUP_STAGE_1 || runState == RUN_STATE_HEATUP_STAGE_2; };
 
     void setSleepMode(bool sleepMode);
+    void setStandbyMode(bool standbyMode);
     void setAutoSleepMinutes(float minutes);
     void setAutoStandbyMinutes(float minutes);
 
