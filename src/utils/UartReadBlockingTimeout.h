@@ -15,13 +15,12 @@ static inline bool uart_read_blocking_timeout(uart_inst_t *uart, uint8_t *dst, s
 
     for (size_t i = 0; i < len; ++i) {
         while (!uart_is_readable(uart)) {
-            if (timeout_check(&ts)) {
+            if (timeout_check(&ts, false)) {
                 return false;
             }
-
             tight_loop_contents();
         }
-        *dst++ = uart_get_hw(uart)->dr;
+        *dst++ = uart_getc(uart);
     }
 
     return true;
