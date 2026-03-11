@@ -477,13 +477,22 @@ void SystemController::setStandbyMode(bool standbyMode) {
         bool wasStandby = settings->getStandbyMode();
 
         settings->setStandbyMode(false);
-        updatePlannedAutoStandby();
 
-        if (wasStandby &&
-            settings->getTargetBrewTemp() > 80 &&
-            currentControlBoardParsedPacket.brew_boiler_temperature < 65) {
-            initiateHeatup();
+        if (wasStandby) {
+            runState = RUN_STATE_UNDETEMINED;
+
+            if (settings->getTargetBrewTemp() > 80 &&
+                currentControlBoardParsedPacket.brew_boiler_temperature < 65) {
+                initiateHeatup();
+            } else {
+                updateControllerSettings();
+            }
+
+            updatePlannedAutoStandby();
+            return;
         }
+
+        updatePlannedAutoStandby();
     }
 
     updateControllerSettings();
