@@ -56,6 +56,7 @@ private:
     nonstd::optional<absolute_time_t> brewStartedAt{};
     nonstd::optional<absolute_time_t> plannedAutoSleepAt{};
     nonstd::optional<absolute_time_t> plannedAutoStandbyAt{};
+    nonstd::optional<absolute_time_t> autoStandbyWakeGraceUntil{};
 
     uart_inst_t* uart;
     PicoQueue<SystemControllerStatusMessage> *outgoingQueue;

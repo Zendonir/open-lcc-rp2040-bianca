@@ -473,6 +473,7 @@ void SystemController::setStandbyMode(bool standbyMode) {
         setSleepMode(false);
         settings->setStandbyMode(true);
         plannedAutoStandbyAt.reset();
+        autoStandbyWakeGraceUntil.reset();
     } else {
         bool wasStandby = settings->getStandbyMode();
 
@@ -480,6 +481,10 @@ void SystemController::setStandbyMode(bool standbyMode) {
 
         if (wasStandby) {
             runState = RUN_STATE_UNDETEMINED;
+
+            // Nach dem Aufwecken Auto-Standby kurz sperren,
+            // damit kein sofortiger Rückfall passieren kann.
+            autoStandbyWakeGraceUntil = delayed_by_ms(get_absolute_time(), 30000);
 
             if (settings->getTargetBrewTemp() > 80 &&
                 currentControlBoardParsedPacket.brew_boiler_temperature < 65) {
@@ -582,6 +587,12 @@ void SystemController::updatePlannedAutoStandby() {
         return;
     }
 
+    if (autoStandbyWakeGraceUntil.has_value() &&
+        !time_reached(autoStandbyWakeGraceUntil.value())) {
+        plannedAutoStandbyAt.reset();
+        return;
+    }
+
     if (settings->getAutoStandbyMin() > 0) {
         uint32_t ms = (uint32_t)settings->getAutoStandbyMin() * 60 * 1000;
         plannedAutoStandbyAt = delayed_by_ms(get_absolute_time(), ms);
@@ -623,6 +634,11 @@ void SystemController::handleRunningStateAutomations() {
                !settings->getStandbyMode() &&
                time_reached(plannedAutoSleepAt.value())) {
         setSleepMode(true);
+    }
+
+    if (autoStandbyWakeGraceUntil.has_value() &&
+        time_reached(autoStandbyWakeGraceUntil.value())) {
+        autoStandbyWakeGraceUntil.reset();
     }
 
     if (!plannedAutoStandbyAt.has_value()) {
