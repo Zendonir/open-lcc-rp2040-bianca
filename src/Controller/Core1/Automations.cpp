@@ -13,11 +13,18 @@ void Automations::loop(SystemControllerStatusMessage sm) {
         settingsManager->setSleepMode(true);
     }
 
-    if (!plannedAutoStandbyAt.has_value()) {
-        resetPlannedStandby();
-    } else if (!settingsManager->getStandbyMode() && time_reached(plannedAutoStandbyAt.value())) {
-        settingsManager->setSleepMode(false);
-        settingsManager->setStandbyMode(true);
+    // Standby timing is owned by Core0.
+    // Core1 only mirrors the remaining standby time for ESP status,
+    // but must never trigger standby itself.
+    if (sm.standbyMode) {
+        plannedAutoStandbyAt.reset();
+    } else if (std::isinf(sm.plannedAutoStandbyInSeconds) || sm.plannedAutoStandbyInSeconds <= 0) {
+        plannedAutoStandbyAt.reset();
+    } else {
+        plannedAutoStandbyAt = delayed_by_ms(
+                get_absolute_time(),
+                static_cast<uint32_t>(sm.plannedAutoStandbyInSeconds * 1000.0f)
+        );
     }
 
     if (sm.currentlyBrewing && !previouslyBrewing) {
@@ -61,12 +68,7 @@ void Automations::resetPlannedSleep() {
 }
 
 void Automations::resetPlannedStandby() {
-    if (settingsManager->getAutoStandbyMin() > 0) {
-        uint32_t ms = (uint32_t)settingsManager->getAutoStandbyMin() * 60 * 1000;
-        plannedAutoStandbyAt = delayed_by_ms(get_absolute_time(), ms);
-    } else {
-        plannedAutoStandbyAt.reset();
-    }
+    plannedAutoStandbyAt.reset();
 }
 
 void Automations::onBrewStarted() {
