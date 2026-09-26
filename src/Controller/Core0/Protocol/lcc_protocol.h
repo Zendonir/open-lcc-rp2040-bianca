@@ -6,7 +6,6 @@
 #define LCC_RELAY_LCC_PROTOCOL_H
 
 #include <cstdint>
-#include <cstdint>
 
 typedef enum : uint16_t {
     LCC_VALIDATION_ERROR_NONE = 0,
