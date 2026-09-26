@@ -40,6 +40,11 @@ void Automations::loop(SystemControllerStatusMessage sm) {
 
     if (!sm.standbyMode && previouslyInStandby) {
         resetPlannedStandby();
+
+        // Core0 leaves standby on its own when the lever is opened, keep the stored setting in sync
+        if (settingsManager->getStandbyMode()) {
+            settingsManager->setStandbyMode(false);
+        }
     }
 
     if (previousAutosleepMinutes != settingsManager->getAutoSleepMin()) {

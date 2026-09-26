@@ -138,7 +138,7 @@ void SystemController::loop() {
             .runState = runState,
             .coalescedState = externalState(),
             .bailReason = bail_reason,
-            .currentlyBrewing = !isBailed() && currentControlBoardParsedPacket.brew_switch,
+            .currentlyBrewing = !isBailed() && brewSwitchActive,
             .currentlyFillingServiceBoiler = currentLccParsedPacket.pump_on &&
                                              currentLccParsedPacket.service_boiler_solenoid_open,
             .waterTankLow = !isBailed() && currentControlBoardParsedPacket.water_tank_empty,
@@ -198,24 +198,45 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
     serviceTempAverage.addValue(latestParsedPacket.service_boiler_temperature);
 
     bool brewing = false;
+    bool brewSwitch = latestParsedPacket.brew_switch;
+
+    // Opening the lever while in standby wakes the machine, but never starts the pump.
+    // The lever has to be closed once before it works normally again.
+    if (settings->getStandbyMode()) {
+        if (brewSwitch && !previousBrewSwitch) {
+            setStandbyMode(false);
+            waitForBrewSwitchRelease = true;
+        }
+    }
+    previousBrewSwitch = brewSwitch;
+
+    if (waitForBrewSwitchRelease && !brewSwitch) {
+        waitForBrewSwitchRelease = false;
+    }
+
+    // In standby, and while waiting for the lever to close, the lever is ignored and nothing is pumped
+    bool pumpLocked = settings->getStandbyMode() || waitForBrewSwitchRelease;
+    if (pumpLocked) {
+        brewSwitch = false;
+    }
+    brewSwitchActive = brewSwitch;
 
     if (!brewStartedAt.has_value()) {
-        if (!waterTankEmptyLatch.get()) {
-            if (latestParsedPacket.brew_switch) {
+        if (!waterTankEmptyLatch.get() && !pumpLocked) {
+            if (brewSwitch) {
                 updateForFlowMode(&lcc);
 
                 brewing = true;
 
                 onBrewStarted();
-            } else if (serviceBoilerLowLatch.get() && !settings->getStandbyMode()) {
-                // In standby both boilers are off, so there is no need to refill the service boiler
+            } else if (serviceBoilerLowLatch.get()) {
                 lcc.pump_on = true;
                 lcc.water_line_solenoid_open = true;
                 lcc.service_boiler_solenoid_open = true;
             }
         }
     } else {
-        if (latestParsedPacket.brew_switch) {
+        if (brewSwitch) {
             updateForFlowMode(&lcc);
             brewing = true;
         } else {
