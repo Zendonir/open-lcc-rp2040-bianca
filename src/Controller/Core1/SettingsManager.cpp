@@ -151,6 +151,13 @@ void SettingsManager::initialize() {
         currentSettings.sleepMode = false;
     }
 
+    // After a power loss (or any other reset not caused by the watchdog) the machine starts switched off.
+    // A watchdog reset keeps the previous state, so a crash does not switch a running machine off.
+    if (!watchdog_enable_caused_reboot()) {
+        currentSettings.standbyMode = true;
+        currentSettings.sleepMode = false;
+    }
+
     sendAllSettings();
 }
 

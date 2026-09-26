@@ -7,6 +7,12 @@
 #include "utils/USBDebug.h"
 
 void Automations::loop(SystemControllerStatusMessage sm) {
+    // Until Core0 has sent its first status, sm is a default message (e.g. standby off),
+    // which must not be mistaken for a state change
+    if (to_us_since_boot(sm.timestamp) == 0) {
+        return;
+    }
+
     if (!plannedAutoSleepAt.has_value()) {
         resetPlannedSleep();
     } else if (!settingsManager->getSleepMode() && !sm.standbyMode && time_reached(plannedAutoSleepAt.value())) {
@@ -36,6 +42,11 @@ void Automations::loop(SystemControllerStatusMessage sm) {
 
     if (!sm.sleepMode && previouslyAsleep) {
         resetPlannedSleep();
+    }
+
+    // Core0 enters auto standby on its own, store it so a watchdog reset keeps the machine off
+    if (sm.standbyMode && !previouslyInStandby && !settingsManager->getStandbyMode()) {
+        settingsManager->setStandbyMode(true);
     }
 
     if (!sm.standbyMode && previouslyInStandby) {
