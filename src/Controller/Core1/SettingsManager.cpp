@@ -209,7 +209,7 @@ void SettingsManager::readSettings() {
             USB_PRINTF("Using migrated v1 settings\n");
 
             memcpy(&currentSettings, &defaultSettings, sizeof(SettingStruct));
-            memcpy(&currentSettings, &read, SETTINGS_V1_LEN);
+            memcpy(static_cast<void *>(&currentSettings), &read, SETTINGS_V1_LEN);
             memcpy(&lastReadSettings, &currentSettings, sizeof(SettingStruct));
             return;
         }

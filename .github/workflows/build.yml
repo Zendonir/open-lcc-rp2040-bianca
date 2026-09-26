@@ -1,0 +1,64 @@
+name: Build firmware
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PICO_SDK_VERSION: 2.1.1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cmake ninja-build
+
+      - name: Cache Pico SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: pico-sdk
+          key: pico-sdk-${{ env.PICO_SDK_VERSION }}
+
+      - name: Fetch Pico SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$PICO_SDK_VERSION" https://github.com/raspberrypi/pico-sdk
+          git -C pico-sdk submodule update --init --depth 1 lib/tinyusb
+
+      - name: Build
+        run: |
+          export PICO_SDK_PATH="$GITHUB_WORKSPACE/pico-sdk"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          # smart_lcc has to be built before smart_lcc_combined, see README
+          cmake --build build --target smart_lcc
+          cmake --build build --target smart_lcc_combined
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: |
+            build/smart_lcc_app.bin
+            build/smart_lcc_combined.uf2
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            build/smart_lcc_app.bin
+            build/smart_lcc_combined.uf2
+            tools/flash_wifi.py

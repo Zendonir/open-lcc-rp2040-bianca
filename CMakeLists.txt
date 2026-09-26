@@ -114,9 +114,11 @@ function(bootloader_build_combined NAME)
     add_custom_command(TARGET ${COMBINED} POST_BUILD
             COMMAND ${CMAKE_OBJCOPY} -Obinary ${COMBINED}.elf ${COMBINED}.bin
     )
-	add_custom_command(TARGET ${COMBINED} POST_BUILD
-        	COMMAND ${CMAKE_BINARY_DIR}/_deps/picotool/picotool.exe uf2 convert ${COMBINED}.elf ${COMBINED}.uf2
-       		VERBATIM)
+    # picotool is located (or fetched and built) by the Pico SDK, works on Windows, Linux and macOS
+    pico_init_picotool()
+    add_custom_command(TARGET ${COMBINED} POST_BUILD
+            COMMAND picotool uf2 convert ${COMBINED}.elf ${COMBINED}.uf2
+            VERBATIM)
 endfunction()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/src build)

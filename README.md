@@ -94,7 +94,26 @@ This project includes a [serial third stage bootloader](https://github.com/usedb
 to be able to update the firmware of the RP2040 over Wi-fi via the ESP32-S3. You can still update firmware via USB, and 
 in that case you should use the `smart_lcc_combined.uf2` file.
 
-To update the firmware via Wi-fi, use [serial-flash](https://github.com/usedbytes/serial-flash) the following command:
+### Updating over Wi-fi with the included script
+
+GitHub Actions builds the firmware on every push (download it from the workflow run). Pushing a tag like `v1.2.3`
+creates a release containing `smart_lcc_app.bin`, `smart_lcc_combined.uf2` and `flash_wifi.py`.
+
+1. Press "Reboot RP2040 to Serial Boot" in Home Assistant (or the ESPHome dashboard)
+2. Within 30 seconds, run (Python 3, no extra packages needed):
+
+```sh
+python3 tools/flash_wifi.py 192.168.1.10                                  # newest release
+python3 tools/flash_wifi.py 192.168.1.10 --release v1.2.3                 # specific release
+python3 tools/flash_wifi.py 192.168.1.10 --file build/smart_lcc_app.bin   # local build
+```
+
+The new image is only started after it has been written and verified completely. If anything fails, the RP2040
+stays in the bootloader and you can simply run the script again.
+
+### Updating over Wi-fi with serial-flash
+
+Alternatively, to update the firmware via Wi-fi, use [serial-flash](https://github.com/usedbytes/serial-flash) the following command:
 
 ```sh
 serial-flash tcp:192.168.1.10:6638 smart_lcc_app.bin 0x10008000
