@@ -123,6 +123,7 @@ struct __attribute__((packed)) ESPSystemStatusMessage {
     bool serviceBoilerOn;
     uint16_t loadedRoutine;
     uint16_t currentRoutineStep;
+    uint16_t autoStandbyAfterBrew;
     /*
      * To add:
      * Pid settings and pid parameters
@@ -145,6 +146,7 @@ enum ESPSystemCommandType: uint32_t {
     ESP_SYSTEM_COMMAND_CANCEL_ROUTINE,
     ESP_SYSTEM_COMMAND_FORCE_HARD_BAIL,
     ESP_SYSTEM_COMMAND_CLEAR_ROUTINE,
+    ESP_SYSTEM_COMMAND_SET_AUTO_STANDBY_AFTER_BREW_MINUTES,
 };
 
 struct __attribute__((packed)) ESPSystemCommandPayload {

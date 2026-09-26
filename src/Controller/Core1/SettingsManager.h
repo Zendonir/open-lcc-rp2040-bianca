@@ -21,6 +21,7 @@ public:
     void setTargetBrewTemp(float targetBrewTemp);
     void setAutoSleepMin(uint16_t minutes);
     void setAutoStandbyMin(uint16_t minutes);
+    void setAutoStandbyAfterBrewMin(uint16_t minutes);
     void setOffsetTargetBrewTemp(float offsetTargetBrewTemp);
     void setTargetServiceTemp(float targetServiceTemp);
     void setBrewPidParameters(PidSettings params);
@@ -34,6 +35,7 @@ public:
     inline float getTargetBrewTemp() const { return currentSettings.brewTemperatureTarget; };
     inline uint16_t getAutoSleepMin() const { return currentSettings.autoSleepMin; };
     inline uint16_t getAutoStandbyMin() const { return currentSettings.autoStandbyMin; };
+    inline uint16_t getAutoStandbyAfterBrewMin() const { return currentSettings.autoStandbyAfterBrewMin; };
     inline float getOffsetTargetBrewTemp() const { return currentSettings.brewTemperatureTarget + currentSettings.brewTemperatureOffset; };
     inline float getTargetServiceTemp() const { return currentSettings.serviceTemperatureTarget; };
     inline PidSettings getBrewPidParameters() const { return currentSettings.brewPidParameters; };

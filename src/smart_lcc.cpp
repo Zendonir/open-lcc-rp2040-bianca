@@ -327,6 +327,7 @@ int i2c_bus_scan(i2c_inst_t* i2c) {
                     externalTemp3,
                     settingsManager->getAutoSleepMin(),
                     settingsManager->getAutoStandbyMin(),
+                    settingsManager->getAutoStandbyAfterBrewMin(),
                     automations->getPlannedSleepInMinutes(),
                     automations->getPlannedStandbyInMinutes(),
                     automations->getCurrentlyLoadedRoutine(),

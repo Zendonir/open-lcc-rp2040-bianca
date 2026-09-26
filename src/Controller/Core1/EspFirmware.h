@@ -34,6 +34,7 @@ public:
                     float externalTemperature3,
                     uint16_t autoSleepMinutes,
                     uint16_t autoStandbyMinutes,
+                    uint16_t autoStandbyAfterBrewMinutes,
                     float plannedSleepInSeconds,
                     float plannedStandbyInSeconds,
                     uint16_t currentRoutine,

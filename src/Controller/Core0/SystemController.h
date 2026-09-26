@@ -92,6 +92,7 @@ private:
     void setStandbyMode(bool standbyMode);
     void setAutoSleepMinutes(float minutes);
     void setAutoStandbyMinutes(float minutes);
+    void setAutoStandbyAfterBrewMinutes(float minutes);
 
     [[nodiscard]] bool areTemperaturesAtSetPoint() const;
 
@@ -119,7 +120,7 @@ private:
     void sendLccPacket();
 
     void updatePlannedAutoSleep();
-    void updatePlannedAutoStandby();
+    void updatePlannedAutoStandby(bool afterBrew = false);
 
     void handleRunningStateAutomations();
 

@@ -89,6 +89,8 @@ struct SettingStruct {
     uint16_t autoStandbyMin = 0;
     PidSettings brewPidParameters = PidSettings{.Kp = 0.8, .Ki = 0.12, .Kd = 12.0, .windupLow = -7.f, .windupHigh = 7.f};
     PidSettings servicePidParameters = PidSettings{.Kp = 0.6, .Ki = 0.1, .Kd = 1.0, .windupLow = -10.f, .windupHigh = 10.f};
+    // Must stay the last field, SettingsManager migrates settings stored without it
+    uint16_t autoStandbyAfterBrewMin = 0;
 };
 
 struct SystemControllerStatusMessage {
@@ -141,6 +143,7 @@ typedef enum {
     COMMAND_BEGIN,
     COMMAND_FORCE_HARD_BAIL,
     COMMAND_SET_FLOW_MODE,
+    COMMAND_SET_AUTO_STANDBY_AFTER_BREW_MINUTES,
 } SystemControllerCommandType;
 
 struct SystemControllerCommand {

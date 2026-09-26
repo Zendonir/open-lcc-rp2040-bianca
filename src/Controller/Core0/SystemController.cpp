@@ -354,6 +354,9 @@ void SystemController::handleCommands() {
             case COMMAND_SET_AUTO_STANDBY_MINUTES:
                 setAutoStandbyMinutes(command.float1);
                 break;
+            case COMMAND_SET_AUTO_STANDBY_AFTER_BREW_MINUTES:
+                setAutoStandbyAfterBrewMinutes(command.float1);
+                break;
             case COMMAND_UNBAIL:
                 unbail();
                 break;
@@ -577,7 +580,7 @@ void SystemController::onBrewStarted() {
 void SystemController::onBrewEnded() {
     brewStartedAt.reset();
     updatePlannedAutoSleep();
-    updatePlannedAutoStandby();
+    updatePlannedAutoStandby(true);
 }
 
 void SystemController::setAutoSleepMinutes(float minutes) {
@@ -594,6 +597,11 @@ void SystemController::setAutoStandbyMinutes(float minutes) {
     updatePlannedAutoStandby();
 }
 
+void SystemController::setAutoStandbyAfterBrewMinutes(float minutes) {
+    // Only takes effect after the next brew, the running timer is left alone
+    settings->setAutoStandbyAfterBrewMin((uint16_t)minutes);
+}
+
 void SystemController::updatePlannedAutoSleep() {
     if (settings->getAutoSleepMin() > 0) {
         uint32_t ms = (uint32_t)settings->getAutoSleepMin() * 60 * 1000;
@@ -603,14 +611,20 @@ void SystemController::updatePlannedAutoSleep() {
     }
 }
 
-void SystemController::updatePlannedAutoStandby() {
+void SystemController::updatePlannedAutoStandby(bool afterBrew) {
     if (settings->getStandbyMode()) {
         plannedAutoStandbyAt.reset();
         return;
     }
 
-    if (settings->getAutoStandbyMin() > 0) {
-        uint32_t ms = (uint32_t)settings->getAutoStandbyMin() * 60 * 1000;
+    // After a brew the (usually shorter) after-brew time is used, if one is set
+    uint16_t minutes = settings->getAutoStandbyMin();
+    if (afterBrew && minutes > 0 && settings->getAutoStandbyAfterBrewMin() > 0) {
+        minutes = settings->getAutoStandbyAfterBrewMin();
+    }
+
+    if (minutes > 0) {
+        uint32_t ms = (uint32_t)minutes * 60 * 1000;
         plannedAutoStandbyAt = delayed_by_ms(get_absolute_time(), ms);
     } else {
         plannedAutoStandbyAt.reset();

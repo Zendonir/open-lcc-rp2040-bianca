@@ -3,12 +3,15 @@
 //
 
 #include <cstring>
+#include <cstddef>
 #include "SettingsManager.h"
 #include "utils/crc32.h"
 #include "hardware/watchdog.h"
 #include "utils/USBDebug.h"
 
-#define SETTINGS_CURRENT_VERSION 0x01
+#define SETTINGS_CURRENT_VERSION 0x02
+// Version 0x01 is the current layout without autoStandbyAfterBrewMin at the end
+#define SETTINGS_V1_LEN offsetof(SettingStruct, autoStandbyAfterBrewMin)
 #define SETTINGS_ADDR 0x00000000
 
 struct SettingsHeader {
@@ -28,6 +31,7 @@ const SettingStruct defaultSettings{
     .autoStandbyMin = 0,
     .brewPidParameters = PidSettings{.Kp = 0.8, .Ki = 0.12, .Kd = 12.0, .windupLow = -7.f, .windupHigh = 7.f},
     .servicePidParameters = PidSettings{.Kp = 0.6, .Ki = 0.1, .Kd = 1.0, .windupLow = -10.f, .windupHigh = 10.f},
+    .autoStandbyAfterBrewMin = 0,
 };
 
 SettingsManager::SettingsManager(PicoQueue<SystemControllerCommand> *commandQueue, SettingsFlash *settingsFlash)
@@ -88,6 +92,14 @@ void SettingsManager::setAutoStandbyMin(uint16_t minutes) {
 
 void SettingsManager::setOffsetTargetBrewTemp(float offsetTargetBrewTemp) {
     setTargetBrewTemp(offsetTargetBrewTemp - currentSettings.brewTemperatureOffset);
+}
+
+void SettingsManager::setAutoStandbyAfterBrewMin(uint16_t minutes) {
+    currentSettings.autoStandbyAfterBrewMin = minutes;
+    sendMessage(SystemControllerCommand{
+        .type = COMMAND_SET_AUTO_STANDBY_AFTER_BREW_MINUTES,
+        .float1 = static_cast<float>(minutes),
+    });
 }
 
 void SettingsManager::setTargetServiceTemp(float targetServiceTemp) {
@@ -187,6 +199,22 @@ void SettingsManager::readSettings() {
         }
     }
 
+    // Settings written before autoStandbyAfterBrewMin existed: keep them and use the default for the new field.
+    // They are written in the new format with the next settings change.
+    if (header.version == 0x01 && header.len == SETTINGS_V1_LEN) {
+        crc32_t readCrc;
+        crc32(&read, SETTINGS_V1_LEN, &readCrc);
+
+        if (readCrc == header.crc) {
+            USB_PRINTF("Using migrated v1 settings\n");
+
+            memcpy(&currentSettings, &defaultSettings, sizeof(SettingStruct));
+            memcpy(&currentSettings, &read, SETTINGS_V1_LEN);
+            memcpy(&lastReadSettings, &currentSettings, sizeof(SettingStruct));
+            return;
+        }
+    }
+
     USB_PRINTF("Using default settings\n");
     memcpy(&currentSettings, &defaultSettings, sizeof(SettingStruct));
 }
@@ -229,6 +257,7 @@ void SettingsManager::sendAllSettings() {
     setTargetBrewTemp(currentSettings.brewTemperatureTarget);
     setAutoSleepMin(currentSettings.autoSleepMin);
     setAutoStandbyMin(currentSettings.autoStandbyMin);
+    setAutoStandbyAfterBrewMin(currentSettings.autoStandbyAfterBrewMin);
     setTargetServiceTemp(currentSettings.serviceTemperatureTarget);
     setBrewPidParameters(currentSettings.brewPidParameters);
     setServicePidParameters(currentSettings.servicePidParameters);

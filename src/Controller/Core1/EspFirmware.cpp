@@ -127,6 +127,7 @@ bool EspFirmware::sendStatus(
         float externalTemperature3,
         uint16_t autoSleepMinutes,
         uint16_t autoStandbyMinutes,
+        uint16_t autoStandbyAfterBrewMinutes,
         float plannedSleepInSeconds,
         float plannedStandbyInSeconds,
         uint16_t currentRoutine,
@@ -200,6 +201,7 @@ bool EspFirmware::sendStatus(
             .serviceBoilerOn = systemControllerStatusMessage->serviceSSRActive,
             .loadedRoutine = currentRoutine,
             .currentRoutineStep = currentRoutineStep,
+            .autoStandbyAfterBrew = autoStandbyAfterBrewMinutes,
     };
 
     ringbuffer.consumerClear();
@@ -352,6 +354,10 @@ void EspFirmware::handleCommand(ESPMessageHeader *header) {
 
                 case ESP_SYSTEM_COMMAND_SET_AUTO_STANDBY_MINUTES:
                     settingsManager->setAutoStandbyMin(message.payload.float1);
+                    break;
+
+                case ESP_SYSTEM_COMMAND_SET_AUTO_STANDBY_AFTER_BREW_MINUTES:
+                    settingsManager->setAutoStandbyAfterBrewMin(message.payload.float1);
                     break;
 
                 case ESP_SYSTEM_COMMAND_FORCE_HARD_BAIL: {
