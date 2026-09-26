@@ -123,6 +123,21 @@ endfunction()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/src build)
 
+# Firmware version reported to the ESP32, e.g. -DFIRMWARE_VERSION=v1.0.2.
+# Defaults to git describe (tag, or commit hash) for local builds.
+if(NOT FIRMWARE_VERSION)
+    execute_process(
+            COMMAND git describe --tags --always --dirty
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            OUTPUT_VARIABLE FIRMWARE_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+endif()
+if(NOT FIRMWARE_VERSION)
+    set(FIRMWARE_VERSION "dev")
+endif()
+message(STATUS "Firmware version: ${FIRMWARE_VERSION}")
+
 add_executable(smart_lcc
         src/smart_lcc.cpp
         src/double_tap.cpp
@@ -166,6 +181,8 @@ add_executable(smart_lcc
 #        src/utils/BufferReader.cpp
 #        src/utils/BufferReader.h
 )
+
+target_compile_definitions(smart_lcc PRIVATE FIRMWARE_VERSION="${FIRMWARE_VERSION}")
 
 target_include_directories(smart_lcc PUBLIC lib/Ring-Buffer lib/optional-bare src)
 

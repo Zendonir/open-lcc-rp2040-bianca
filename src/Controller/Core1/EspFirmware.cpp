@@ -3,6 +3,7 @@
 //
 
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include "EspFirmware.h"
 #include "pico/time.h"
@@ -202,7 +203,14 @@ bool EspFirmware::sendStatus(
             .loadedRoutine = currentRoutine,
             .currentRoutineStep = currentRoutineStep,
             .autoStandbyAfterBrew = autoStandbyAfterBrewMinutes,
+            .firmwareVersion = {},
     };
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "dev"
+#endif
+    strncpy(statusMessage.firmwareVersion, FIRMWARE_VERSION, sizeof(statusMessage.firmwareVersion) - 1);
+    statusMessage.firmwareVersion[sizeof(statusMessage.firmwareVersion) - 1] = '\0';
 
     ringbuffer.consumerClear();
 

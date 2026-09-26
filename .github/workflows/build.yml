@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Tags are needed for the version (git describe)
+          fetch-depth: 0
 
       - name: Install toolchain
         run: |
@@ -45,7 +48,10 @@ jobs:
       - name: Build
         run: |
           export PICO_SDK_PATH="$GITHUB_WORKSPACE/pico-sdk"
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          # Releases report their tag as version, other builds use git describe
+          VERSION="${{ inputs.release_tag }}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="$GITHUB_REF_NAME"; fi
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${VERSION:+-DFIRMWARE_VERSION=$VERSION}
           # smart_lcc has to be built before smart_lcc_combined, see README
           cmake --build build --target smart_lcc
           cmake --build build --target smart_lcc_combined

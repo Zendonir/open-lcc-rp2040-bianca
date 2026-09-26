@@ -124,6 +124,7 @@ struct __attribute__((packed)) ESPSystemStatusMessage {
     uint16_t loadedRoutine;
     uint16_t currentRoutineStep;
     uint16_t autoStandbyAfterBrew;
+    char firmwareVersion[16]; // zero terminated, e.g. "v1.0.2"
     /*
      * To add:
      * Pid settings and pid parameters
