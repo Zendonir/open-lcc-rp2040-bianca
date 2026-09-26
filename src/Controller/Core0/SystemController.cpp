@@ -503,6 +503,11 @@ void SystemController::setStandbyMode(bool standbyMode) {
         if (wasStandby) {
             runState = RUN_STATE_UNDETEMINED;
 
+            // Waking up (by lever or from the ESP) with the lever open must not start the pump
+            if (currentControlBoardParsedPacket.brew_switch) {
+                waitForBrewSwitchRelease = true;
+            }
+
             if (settings->getTargetBrewTemp() > 80 &&
                 currentControlBoardParsedPacket.brew_boiler_temperature < 65) {
                 initiateHeatup();
