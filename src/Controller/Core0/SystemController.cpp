@@ -207,7 +207,8 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
                 brewing = true;
 
                 onBrewStarted();
-            } else if (serviceBoilerLowLatch.get()) {
+            } else if (serviceBoilerLowLatch.get() && !settings->getStandbyMode()) {
+                // In standby both boilers are off, so there is no need to refill the service boiler
                 lcc.pump_on = true;
                 lcc.water_line_solenoid_open = true;
                 lcc.service_boiler_solenoid_open = true;

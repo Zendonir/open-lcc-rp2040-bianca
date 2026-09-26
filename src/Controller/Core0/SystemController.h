@@ -105,7 +105,9 @@ private:
     PicoQueue<SsrState> ssrStateQueue = PicoQueue<SsrState>(25);
 
     TimedLatch waterTankEmptyLatch = TimedLatch(1000, false);
-    TimedLatch serviceBoilerLowLatch = TimedLatch(500, false);
+    // Level probe flickers when the service boiler is hot, so require the low signal to be stable
+    // for 3 s before starting a refill. Stop the refill 500 ms after the boiler reads full again.
+    TimedLatch serviceBoilerLowLatch = TimedLatch(3000, 500, false);
 
     void handleCommands();
     void updateControllerSettings();

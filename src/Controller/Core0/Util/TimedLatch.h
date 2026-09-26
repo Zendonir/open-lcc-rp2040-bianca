@@ -11,12 +11,15 @@
 class TimedLatch {
 public:
     TimedLatch(uint16_t thresholdMs, bool currentState);
+    // Separate thresholds for switching to true (rising) and to false (falling)
+    TimedLatch(uint16_t risingThresholdMs, uint16_t fallingThresholdMs, bool currentState);
 
     bool get() const;
     void set(bool value);
     void setImmediate(bool value);
 private:
-    uint16_t threshold;
+    uint16_t risingThreshold;
+    uint16_t fallingThreshold;
 
     bool currentState;
     nonstd::optional<absolute_time_t> changingSince = nonstd::nullopt;

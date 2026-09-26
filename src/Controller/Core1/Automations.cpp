@@ -9,7 +9,8 @@
 void Automations::loop(SystemControllerStatusMessage sm) {
     if (!plannedAutoSleepAt.has_value()) {
         resetPlannedSleep();
-    } else if (!settingsManager->getSleepMode() && time_reached(plannedAutoSleepAt.value())) {
+    } else if (!settingsManager->getSleepMode() && !sm.standbyMode && time_reached(plannedAutoSleepAt.value())) {
+        // Never enter sleep from standby, entering sleep would turn the brew boiler back on
         settingsManager->setSleepMode(true);
     }
 
