@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Create a release with this tag (e.g. v1.0.0), leave empty for a plain build'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -54,9 +59,12 @@ jobs:
             build/smart_lcc_combined.uf2
 
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          # For a manual run the tag is created on the built commit
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             build/smart_lcc_app.bin
