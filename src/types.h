@@ -124,6 +124,14 @@ struct SystemControllerStatusMessage {
     uint16_t sbRawHi{};
     uint16_t sbRawLo{};
     FlowMode flowMode{};
+    bool pumpOn{};
+    bool waterLineSolenoidOpen{};
+    bool serviceBoilerSolenoidOpen{};
+    bool serviceBoilerLevelLow{};
+    bool brewSwitch{};
+    bool pumpLocked{};
+    uint8_t brewBoilerPower{};
+    uint8_t serviceBoilerPower{};
 };
 
 typedef enum {

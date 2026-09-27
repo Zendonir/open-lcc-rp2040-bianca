@@ -148,6 +148,14 @@ void SystemController::loop() {
             .sbRawHi = sbHi,
             .sbRawLo = sbLow,
             .flowMode = flowMode,
+            .pumpOn = currentLccParsedPacket.pump_on,
+            .waterLineSolenoidOpen = currentLccParsedPacket.water_line_solenoid_open,
+            .serviceBoilerSolenoidOpen = currentLccParsedPacket.service_boiler_solenoid_open,
+            .serviceBoilerLevelLow = !isBailed() && currentControlBoardParsedPacket.service_boiler_low,
+            .brewSwitch = !isBailed() && currentControlBoardParsedPacket.brew_switch,
+            .pumpLocked = !isBailed() && waitForBrewSwitchRelease,
+            .brewBoilerPower = static_cast<uint8_t>(isBailed() ? 0 : brewBoilerSlots * 4),
+            .serviceBoilerPower = static_cast<uint8_t>(isBailed() ? 0 : serviceBoilerSlots * 4),
     };
 
     if (!outgoingQueue->isFull()) {
@@ -269,6 +277,9 @@ LccParsedPacket SystemController::handleControlBoardPacket(ControlBoardParsedPac
         }
 
         uint8_t noSignal = 25 - bbSignal - sbSignal;
+
+        brewBoilerSlots = bbSignal;
+        serviceBoilerSlots = sbSignal;
 
         for (uint8_t i = 0; i < bbSignal; ++i) {
             SsrState state = BREW_BOILER_SSR_ON;

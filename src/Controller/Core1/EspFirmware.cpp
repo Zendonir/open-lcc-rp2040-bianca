@@ -204,6 +204,15 @@ bool EspFirmware::sendStatus(
             .currentRoutineStep = currentRoutineStep,
             .autoStandbyAfterBrew = autoStandbyAfterBrewMinutes,
             .firmwareVersion = {},
+            .pumpOn = systemControllerStatusMessage->pumpOn,
+            .waterLineSolenoidOpen = systemControllerStatusMessage->waterLineSolenoidOpen,
+            .serviceBoilerSolenoidOpen = systemControllerStatusMessage->serviceBoilerSolenoidOpen,
+            .serviceBoilerLevelLow = systemControllerStatusMessage->serviceBoilerLevelLow,
+            .brewSwitch = systemControllerStatusMessage->brewSwitch,
+            .pumpLocked = systemControllerStatusMessage->pumpLocked,
+            .bailReason = static_cast<uint8_t>(systemControllerStatusMessage->bailReason),
+            .brewBoilerPower = systemControllerStatusMessage->brewBoilerPower,
+            .serviceBoilerPower = systemControllerStatusMessage->serviceBoilerPower,
     };
 
 #ifndef FIRMWARE_VERSION

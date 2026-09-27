@@ -125,6 +125,16 @@ struct __attribute__((packed)) ESPSystemStatusMessage {
     uint16_t currentRoutineStep;
     uint16_t autoStandbyAfterBrew;
     char firmwareVersion[16]; // zero terminated, e.g. "v1.0.2"
+    // Diagnostics
+    bool pumpOn;
+    bool waterLineSolenoidOpen;
+    bool serviceBoilerSolenoidOpen;
+    bool serviceBoilerLevelLow; // raw level probe of the control board
+    bool brewSwitch; // raw lever state, also while it is ignored
+    bool pumpLocked; // lever has to be closed before the pump runs again
+    uint8_t bailReason;
+    uint8_t brewBoilerPower; // percent of the current 2.5 s heating window
+    uint8_t serviceBoilerPower;
     /*
      * To add:
      * Pid settings and pid parameters

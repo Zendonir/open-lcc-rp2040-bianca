@@ -60,6 +60,10 @@ private:
     bool previousBrewSwitch = false;
     bool waitForBrewSwitchRelease = false;
     bool brewSwitchActive = false;
+
+    // Heating slots (of 25) of the current SSR window, for diagnostics
+    uint8_t brewBoilerSlots = 0;
+    uint8_t serviceBoilerSlots = 0;
   
     uart_inst_t* uart;
     PicoQueue<SystemControllerStatusMessage> *outgoingQueue;
